@@ -7,6 +7,7 @@ from pathlib import Path
 from pprint import pprint
 from random import randint, randrange
 from typing import Any, Dict, List, Literal, Optional, Tuple, Union, cast
+from urllib.parse import unquote, urlparse
 
 import numpy as np
 import orjson
@@ -20,6 +21,7 @@ from .addons import DefaultAddons, add_default_addons, confirm_paths
 from .exceptions import (
     InvalidOS,
     InvalidPropertyType,
+    InvalidProxy,
     NonFirefoxFingerprint,
 )
 from .fingerprints import from_browserforge, from_preset, generate_fingerprint, get_random_preset, _generate_random_font_subset, _generate_random_voice_subset, fix_navigator_arch, fix_screen_no_taskbar, clamp_window_dimensions, set_media_devices_defaults
@@ -41,6 +43,58 @@ CACHE_PREFS = {
     'browser.cache.disk_cache_ssl': True,
     'browser.cache.disk.smart_size.enabled': True,
 }
+
+# SOCKS5 username/password credentials cannot be delivered through Playwright -- its driver
+# rejects socks5 proxies carrying credentials outright. The credentials are stripped out of
+# the proxy and handed to the browser through this env var, which the Juggler side looks up
+# by host:port (see socksProxyCredentials in additions/juggler/NetworkObserver.js)
+PROXY_CREDENTIALS_ENV = 'CAMOU_PROXY_CREDENTIALS'
+
+# socks5h differs from socks5 only in having the proxy resolve the hostname, which Camoufox
+# does anyway; Playwright does not recognize socks5h and treats it as an HTTP proxy, so it is
+# rewritten to socks5 across the board
+SOCKS5_SCHEMES = ('socks5', 'socks5h')
+
+
+def split_socks_credentials(
+    proxy: Optional[Dict[str, str]],
+) -> Tuple[Optional[Dict[str, str]], Optional[Dict[str, Dict[str, str]]]]:
+    """
+    Splits SOCKS5 credentials out of a Playwright proxy dict.
+
+    Returns the proxy to hand to Playwright, and the credentials to deliver through the
+    environment, keyed by "host:port". Non-SOCKS5 proxies are returned untouched: their
+    credentials go through Playwright as usual.
+    """
+    if not proxy or not proxy.get('server'):
+        return proxy, None
+
+    parsed = urlparse(proxy['server'])
+    if parsed.scheme.lower() not in SOCKS5_SCHEMES:
+        return proxy, None
+
+    username = proxy.get('username') or unquote(parsed.username or '')
+    password = proxy.get('password') or unquote(parsed.password or '')
+
+    if not parsed.hostname:
+        raise InvalidProxy(f"Invalid proxy server: {proxy['server']}")
+    if username and not parsed.port:
+        raise InvalidProxy(
+            f"An authenticated SOCKS5 proxy needs an explicit port: {proxy['server']}"
+        )
+
+    server = f"socks5://{parsed.hostname}"
+    if parsed.port:
+        server += f":{parsed.port}"
+
+    playwright_proxy = {k: v for k, v in proxy.items() if k not in ('username', 'password')}
+    playwright_proxy['server'] = server
+
+    if not username:
+        return playwright_proxy, None
+    return playwright_proxy, {
+        f"{parsed.hostname}:{parsed.port}": {'username': username, 'password': password}
+    }
 
 
 def _generate_fontconfig(fontconfig_path: str) -> str:
@@ -829,9 +883,19 @@ def launch_options(
     # Validate the config
     validate_config(config, path=executable_path)
 
+    # Strip out the SOCKS5 credentials so they travel through the env var instead; an
+    # explicitly passed env wins, which allows declaring credentials for several proxies
+    # up front
+    proxy, proxy_credentials = split_socks_credentials(proxy)
+
     # Prepare environment variables to pass to Camoufox
     env_vars = {
         **get_env_vars(config, target_os),
+        **(
+            {PROXY_CREDENTIALS_ENV: orjson.dumps(proxy_credentials).decode()}
+            if proxy_credentials
+            else {}
+        ),
         **env,
     }
     # Prepare the executable path

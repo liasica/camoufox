@@ -15,11 +15,14 @@ from typing_extensions import Literal
 
 from camoufox.virtdisplay import VirtualDisplay
 
+from .exceptions import InvalidProxy
 from .fingerprints import generate_context_fingerprint
 from .utils import (
+    PROXY_CREDENTIALS_ENV,
     async_attach_vd,
     attach_no_viewport_default,
     launch_options,
+    split_socks_credentials,
     spoofs_window_dimensions,
 )
 
@@ -183,6 +186,19 @@ async def AsyncNewContext(
         geolocation: Per-context geolocation ({"latitude": float, "longitude": float}).
         **context_kwargs: Additional Playwright new_context() options.
     """
+    # Per-context SOCKS5 credentials cannot be delivered: the env var is fixed at browser
+    # launch. Raise right here instead of letting the connection fail quietly at the proxy
+    # end later on
+    proxy, socks_credentials = split_socks_credentials(proxy)
+    if socks_credentials:
+        raise InvalidProxy(
+            "Per-context SOCKS5 credentials cannot be delivered after the browser has "
+            "started. Declare them at launch instead, e.g. "
+            f"Camoufox(env={{'{PROXY_CREDENTIALS_ENV}': json.dumps("
+            '{"host:port": {"username": "...", "password": "..."}})}), '
+            "and pass the proxy without credentials here."
+        )
+
     # Auto-derive WebRTC IP and timezone from proxy's exit IP when not explicitly provided
     if proxy and (not webrtc_ip or "timezone_id" not in context_kwargs):
         geo = await _resolve_proxy_geo(proxy)

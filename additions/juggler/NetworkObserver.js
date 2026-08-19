@@ -26,6 +26,52 @@ const StorageStream = CC('@mozilla.org/storagestream;1', 'nsIStorageStream', 'in
 // Cap response storage with 100Mb per tracked tab.
 const MAX_RESPONSE_STORAGE_SIZE = 100 * 1024 * 1024;
 
+// SOCKS5 username/password authentication (RFC 1929) credentials have to be handed over
+// together with nsIProxyInfo. Playwright's driver rejects socks5 proxies carrying
+// credentials on the client side, so they never reach the protocol layer; passing them
+// through an env var is supported as well, in the format:
+// CAMOU_PROXY_CREDENTIALS={"host:port": {"username": "...", "password": "..."}}
+const PROXY_CREDENTIALS_ENV = 'CAMOU_PROXY_CREDENTIALS';
+let proxyCredentialsFromEnv;
+
+function loadProxyCredentialsFromEnv() {
+  const credentials = new Map();
+  let raw = '';
+  try {
+    raw = Services.env.get(PROXY_CREDENTIALS_ENV);
+  } catch (e) {
+    return credentials;
+  }
+  if (!raw)
+    return credentials;
+  try {
+    for (const [endpoint, value] of Object.entries(JSON.parse(raw))) {
+      credentials.set(endpoint.toLowerCase(), {
+        username: value.username || '',
+        password: value.password || '',
+      });
+    }
+  } catch (e) {
+    dump(`WARNING: failed to parse ${PROXY_CREDENTIALS_ENV}: ${e}\n`);
+  }
+  return credentials;
+}
+
+// Returns the credentials to use for this proxy, or null if there are none. Only socks and
+// socks4 can carry credentials: for other types nsProtocolProxyService returns
+// NS_ERROR_NOT_IMPLEMENTED, and an exception thrown inside the filter is swallowed silently
+// and falls back to defaultProxyInfo (a direct connection), leaking the real IP. Hence the
+// type check has to come first
+function socksProxyCredentials(proxy) {
+  if (proxy.type !== 'socks' && proxy.type !== 'socks4')
+    return null;
+  if (proxy.username || proxy.password)
+    return {username: proxy.username || '', password: proxy.password || ''};
+  if (!proxyCredentialsFromEnv)
+    proxyCredentialsFromEnv = loadProxyCredentialsFromEnv();
+  return proxyCredentialsFromEnv.get(`${proxy.host}:${proxy.port}`.toLowerCase()) || null;
+}
+
 const pageNetworkSymbol = Symbol('PageNetwork');
 
 export class PageNetwork {
@@ -623,16 +669,37 @@ export class NetworkObserver {
         }
         if (this._targetRegistry.shouldBustHTTPAuthCacheForProxy(proxy))
           Services.obs.notifyObservers(null, "net:clear-active-logins");
-        proxyFilter.onProxyFilterResult(protocolProxyService.newProxyInfo(
-            proxy.type,
-            proxy.host,
-            proxy.port,
-            '', /* aProxyAuthorizationHeader */
-            '', /* aConnectionIsolationKey */
-            Ci.nsIProxyInfo.TRANSPARENT_PROXY_RESOLVES_HOST, /* aFlags */
-            UINT32_MAX, /* aFailoverTimeout */
-            null, /* failover proxy */
-        ));
+        const credentials = socksProxyCredentials(proxy);
+        // Gecko only negotiates authentication when the username is non-empty; a password on
+        // its own is never sent. Such a configuration falls back to a proxy without
+        // authentication, so the proxy end refuses the connection instead of the request
+        // quietly turning into a direct one
+        if (credentials && !credentials.username)
+          dump(`WARNING: ignoring proxy password for ${proxy.host}:${proxy.port}: username is empty\n`);
+        const proxyInfo = credentials && credentials.username ?
+            protocolProxyService.newProxyInfoWithAuth(
+                proxy.type,
+                proxy.host,
+                proxy.port,
+                credentials.username,
+                credentials.password,
+                '', /* aProxyAuthorizationHeader */
+                '', /* aConnectionIsolationKey */
+                Ci.nsIProxyInfo.TRANSPARENT_PROXY_RESOLVES_HOST, /* aFlags */
+                UINT32_MAX, /* aFailoverTimeout */
+                null, /* failover proxy */
+            ) :
+            protocolProxyService.newProxyInfo(
+                proxy.type,
+                proxy.host,
+                proxy.port,
+                '', /* aProxyAuthorizationHeader */
+                '', /* aConnectionIsolationKey */
+                Ci.nsIProxyInfo.TRANSPARENT_PROXY_RESOLVES_HOST, /* aFlags */
+                UINT32_MAX, /* aFailoverTimeout */
+                null, /* failover proxy */
+            );
+        proxyFilter.onProxyFilterResult(proxyInfo);
       },
     };
     protocolProxyService.registerChannelFilter(this._channelProxyFilter, 0 /* position */);

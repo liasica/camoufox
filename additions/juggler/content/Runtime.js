@@ -56,6 +56,8 @@ const disallowedMessageCategories = new Set([
 class Runtime {
   constructor(isWorker = false) {
     this._debugger = new Debugger();
+    // Keep Juggler's debugger from changing runtime behavior the page can observe
+    this._debugger.invisibleToContent = true;
     this._pendingPromises = new Map();
     this._executionContexts = new Map();
     this._windowToExecutionContext = new Map();

@@ -85,6 +85,13 @@ def _suppress_insecure_warning():
         yield
 
 
+# Probing the exit IP through a proxy takes an extra hop plus a TLS handshake behind the
+# proxy; 5 seconds is not enough for a proxy that routes the long way around. Direct
+# connections keep the original 5 seconds
+DIRECT_IP_TIMEOUT = 5
+PROXIED_IP_TIMEOUT = 15
+
+
 @lru_cache(maxsize=None)
 def public_ip(proxy: Optional[str] = None) -> str:
     """
@@ -108,7 +115,7 @@ def public_ip(proxy: Optional[str] = None) -> str:
                 resp = requests.get(  # nosec
                     url,
                     proxies=Proxy.as_requests_proxy(proxy) if proxy else None,
-                    timeout=5,
+                    timeout=PROXIED_IP_TIMEOUT if proxy else DIRECT_IP_TIMEOUT,
                     verify=False,
                 )
             resp.raise_for_status()

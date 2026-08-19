@@ -1,6 +1,9 @@
 ac_add_options --disable-update-agent
 # ac_add_options --disable-alsa
 
+# macOS does not build the CoreText registration path for bundled fonts by default
+ac_add_options --enable-bundled-fonts
+
 # Packaging related
 # #export DSYMUTIL="$MOZBUILD/clang/bin/dsymutil"
 # export DMG_TOOL="$MOZBUILD/dmg/dmg"

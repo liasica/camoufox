@@ -189,7 +189,17 @@ def _load_properties(path: Optional[Path] = None) -> Dict[str, str]:
     Loads the properties.json file.
     """
     if path:
-        prop_file = str(path.parent / "properties.json")
+        # The macOS executable lives under Camoufox.app/Contents/MacOS while properties.json
+        # is installed in the sibling Resources dir (see pkgman.LAUNCH_FILE['mac']), so both
+        # locations have to be checked
+        candidates = (
+            path.parent / "properties.json",
+            path.parent.parent / "Resources" / "properties.json",
+        )
+        prop_file = next(
+            (str(candidate) for candidate in candidates if candidate.is_file()),
+            str(candidates[0]),
+        )
     else:
         prop_file = get_path("properties.json")
     with open(prop_file, "rb") as f:

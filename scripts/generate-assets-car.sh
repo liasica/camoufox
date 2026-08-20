@@ -155,26 +155,62 @@ copy_or_resize() {
 }
 
 # Map branding icons to xcassets icons
-copy_or_resize "$BRANDING_DIR/default16.png" "$APPICONSET_DIR/icon_16x16.png" 16
-copy_or_resize "$BRANDING_DIR/default32.png" "$APPICONSET_DIR/icon_16x16@2x.png" 32
-copy_or_resize "$BRANDING_DIR/default32.png" "$APPICONSET_DIR/icon_32x32.png" 32
-copy_or_resize "$BRANDING_DIR/default64.png" "$APPICONSET_DIR/icon_32x32@2x.png" 64
-copy_or_resize "$BRANDING_DIR/default128.png" "$APPICONSET_DIR/icon_128x128.png" 128
-copy_or_resize "$BRANDING_DIR/default256.png" "$APPICONSET_DIR/icon_128x128@2x.png" 256
-copy_or_resize "$BRANDING_DIR/default256.png" "$APPICONSET_DIR/icon_256x256.png" 256
-copy_or_resize "$BRANDING_DIR/default256.png" "$APPICONSET_DIR/icon_256x256@2x.png" 512
-copy_or_resize "$BRANDING_DIR/default256.png" "$APPICONSET_DIR/icon_512x512.png" 512
-copy_or_resize "$BRANDING_DIR/default256.png" "$APPICONSET_DIR/icon_512x512@2x.png" 1024
+# 优先使用专用的 macOS 母图（1024px，Apple HIG 圆角方形风格），
+# 从它缩放出全部尺寸；不存在时回退到平面 default*.png 旧逻辑
+MACOS_MASTER="$BRANDING_DIR/macos-icon.png"
+if [[ -f "$MACOS_MASTER" ]]; then
+    for entry in \
+        "icon_16x16.png 16" "icon_16x16@2x.png 32" \
+        "icon_32x32.png 32" "icon_32x32@2x.png 64" \
+        "icon_128x128.png 128" "icon_128x128@2x.png 256" \
+        "icon_256x256.png 256" "icon_256x256@2x.png 512" \
+        "icon_512x512.png 512" "icon_512x512@2x.png 1024"; do
+        name="${entry% *}"
+        size="${entry#* }"
+        cp "$MACOS_MASTER" "$APPICONSET_DIR/$name"
+        sips -z "$size" "$size" "$APPICONSET_DIR/$name" >/dev/null 2>&1 || true
+    done
+else
+    copy_or_resize "$BRANDING_DIR/default16.png" "$APPICONSET_DIR/icon_16x16.png" 16
+    copy_or_resize "$BRANDING_DIR/default32.png" "$APPICONSET_DIR/icon_16x16@2x.png" 32
+    copy_or_resize "$BRANDING_DIR/default32.png" "$APPICONSET_DIR/icon_32x32.png" 32
+    copy_or_resize "$BRANDING_DIR/default64.png" "$APPICONSET_DIR/icon_32x32@2x.png" 64
+    copy_or_resize "$BRANDING_DIR/default128.png" "$APPICONSET_DIR/icon_128x128.png" 128
+    copy_or_resize "$BRANDING_DIR/default256.png" "$APPICONSET_DIR/icon_128x128@2x.png" 256
+    copy_or_resize "$BRANDING_DIR/default256.png" "$APPICONSET_DIR/icon_256x256.png" 256
+    copy_or_resize "$BRANDING_DIR/default256.png" "$APPICONSET_DIR/icon_256x256@2x.png" 512
+    copy_or_resize "$BRANDING_DIR/default256.png" "$APPICONSET_DIR/icon_512x512.png" 512
+    copy_or_resize "$BRANDING_DIR/default256.png" "$APPICONSET_DIR/icon_512x512@2x.png" 1024
+fi
 
 # Generate Assets.car using actool
+# 存在 AppIcon.icon（Icon Composer 文档）时一并编译进 Assets.car：
+# macOS 26+ 由此获得原生新式图标（系统自行裁切圆角，不会被套默认白底板），
+# 旧式 xcassets 资产仍然编入供老系统读取；同时用 actool 渲染出的
+# AppIcon.icns 更新 firefox.icns，让旧系统的回退图标也是系统造型渲染版
 TEMP_DIR=$(mktemp -d)
-"$ACTOOL" \
-    --compile "$TEMP_DIR" \
-    --platform macosx \
-    --minimum-deployment-target 10.15 \
-    --app-icon AppIcon \
-    --output-partial-info-plist "$TEMP_DIR/Info.plist" \
-    "$XCASSETS_DIR"
+ICON_DOC="$BRANDING_DIR/AppIcon.icon"
+if [[ -d "$ICON_DOC" ]]; then
+    "$ACTOOL" "$ICON_DOC" "$XCASSETS_DIR" \
+        --compile "$TEMP_DIR" \
+        --platform macosx \
+        --minimum-deployment-target 10.15 \
+        --app-icon AppIcon \
+        --include-all-app-icons \
+        --output-partial-info-plist "$TEMP_DIR/Info.plist"
+    if [[ -f "$TEMP_DIR/AppIcon.icns" ]]; then
+        cp "$TEMP_DIR/AppIcon.icns" "$BRANDING_DIR/firefox.icns"
+        echo "Updated firefox.icns from AppIcon.icon"
+    fi
+else
+    "$ACTOOL" \
+        --compile "$TEMP_DIR" \
+        --platform macosx \
+        --minimum-deployment-target 10.15 \
+        --app-icon AppIcon \
+        --output-partial-info-plist "$TEMP_DIR/Info.plist" \
+        "$XCASSETS_DIR"
+fi
 
 # Move the generated Assets.car
 if [[ -f "$TEMP_DIR/Assets.car" ]]; then

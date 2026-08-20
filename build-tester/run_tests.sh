@@ -19,7 +19,7 @@ while [[ $# -gt 0 ]]; do
             ;;
         -h|--help)
             echo "Usage: $0 <binary_path> [--profile-count N] [--secret KEY] [--save-cert PATH] [--no-cert]"
-            echo "  e.g. $0 ../camoufox-146.0.1-beta.25/obj-aarch64-apple-darwin/dist/Camoufox.app"
+            echo "  e.g. $0 ../camoufox-146.0.1-beta.25/obj-aarch64-apple-darwin/dist/Felora.app"
             exit 0
             ;;
         -*)

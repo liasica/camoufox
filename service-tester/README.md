@@ -21,10 +21,10 @@ End-to-end antibot-detection tests that verify a pip-installed camoufox release 
 2. Create a `.venv` virtualenv (first run only)
 3. Build a wheel from `../pythonlib` and install it (tests the actual packaged artifact)
 4. **Phase 1** — run the suite against the locally compiled binary, auto-detected from:
-   - macOS: `../camoufox-*/obj-*-apple-darwin/dist/Camoufox.app/Contents/MacOS/camoufox`
+   - macOS: `../camoufox-*/obj-*-apple-darwin/dist/Felora.app/Contents/MacOS/camoufox`
    - Linux: `../camoufox-*/obj-*-linux-*/dist/bin/camoufox-bin`
 
-   Skipped (with a notice) if no local build is found. On macOS, the script also copies `properties.json` from `Camoufox.app/Contents/Resources/` into `MacOS/` so pythonlib can locate it next to the binary.
+   Skipped (with a notice) if no local build is found. On macOS, the script also copies `properties.json` from `Felora.app/Contents/Resources/` into `MacOS/` so pythonlib can locate it next to the binary.
 5. **Phase 2** — download the official binary (`--browser-version`, default `official/stable`) and run the suite against it
 6. Exit `0` only if both phases pass
 

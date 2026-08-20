@@ -83,11 +83,11 @@ trap 'rm -rf "$TMP_DIR"' EXIT
 
 unzip -q "$ARTIFACT" -d "$TMP_DIR"
 
-# Handle macOS structure: the zip may contain Camoufox.app directly or nested
-if [[ -d "$TMP_DIR/Camoufox.app" ]]; then
-    mv "$TMP_DIR/Camoufox.app" "$INSTALL_DIR/Camoufox.app"
-elif [[ -d "$TMP_DIR/Camoufox/Camoufox.app" ]]; then
-    mv "$TMP_DIR/Camoufox/Camoufox.app" "$INSTALL_DIR/Camoufox.app"
+# Handle macOS structure: the zip may contain Felora.app directly or nested
+if [[ -d "$TMP_DIR/Felora.app" ]]; then
+    mv "$TMP_DIR/Felora.app" "$INSTALL_DIR/Felora.app"
+elif [[ -d "$TMP_DIR/Felora/Felora.app" ]]; then
+    mv "$TMP_DIR/Felora/Felora.app" "$INSTALL_DIR/Felora.app"
 else
     # Linux/Windows: move everything
     mv "$TMP_DIR"/* "$INSTALL_DIR/"
@@ -131,7 +131,7 @@ echo "Installed: $INSTALL_DIR"
 echo "Active:    $RELATIVE_PATH"
 
 # Verify
-PLIST="$INSTALL_DIR/Camoufox.app/Contents/Info.plist"
+PLIST="$INSTALL_DIR/Felora.app/Contents/Info.plist"
 if [[ -f "$PLIST" ]]; then
     BUNDLE_VERSION="$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$PLIST" 2>/dev/null || echo "unknown")"
     echo "Bundle:    $BUNDLE_VERSION"

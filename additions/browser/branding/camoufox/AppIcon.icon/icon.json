@@ -1,0 +1,18 @@
+{
+  "fill" : {
+    "solid" : "srgb:0.137,0.122,0.333,1.000"
+  },
+  "groups" : [
+    {
+      "layers" : [
+        {
+          "image-name" : "felora.png",
+          "name" : "felora"
+        }
+      ]
+    }
+  ],
+  "supported-platforms" : {
+    "squares" : "shared"
+  }
+}

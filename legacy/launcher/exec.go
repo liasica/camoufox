@@ -18,7 +18,7 @@ func getExecutableName() string {
 	case "linux":
 		return getPath("camoufox-bin")
 	case "macos":
-		return getPath("Camoufox.app")
+		return getPath("Felora.app")
 	case "windows":
 		return getPath("camoufox.exe")
 	default:

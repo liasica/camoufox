@@ -31,10 +31,10 @@ def add_includes_to_package(package_file, includes, fonts, new_file, target):
             )
 
         if target == 'macos':
-            # Move Camoufox/Camoufox.app -> Camoufox.app
-            nightly_dir = os.path.join(temp_dir, 'Camoufox')
+            # Move Felora/Felora.app -> Felora.app
+            nightly_dir = os.path.join(temp_dir, 'Felora')
             shutil.move(
-                os.path.join(nightly_dir, 'Camoufox.app'), os.path.join(temp_dir, 'Camoufox.app')
+                os.path.join(nightly_dir, 'Felora.app'), os.path.join(temp_dir, 'Felora.app')
             )
             # Remove old app dir and all content in it
             shutil.rmtree(nightly_dir)
@@ -51,7 +51,7 @@ def add_includes_to_package(package_file, includes, fonts, new_file, target):
 
         # Create target_dir
         if target == 'macos':
-            target_dir = os.path.join(temp_dir, 'Camoufox.app', 'Contents', 'Resources')
+            target_dir = os.path.join(temp_dir, 'Felora.app', 'Contents', 'Resources')
         else:
             target_dir = temp_dir
 

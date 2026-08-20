@@ -189,7 +189,7 @@ def _load_properties(path: Optional[Path] = None) -> Dict[str, str]:
     Loads the properties.json file.
     """
     if path:
-        # The macOS executable lives under Camoufox.app/Contents/MacOS while properties.json
+        # The macOS executable lives under Felora.app/Contents/MacOS while properties.json
         # is installed in the sibling Resources dir (see pkgman.LAUNCH_FILE['mac']), so both
         # locations have to be checked
         candidates = (
